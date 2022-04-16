@@ -9,9 +9,9 @@ namespace NVM
 		{
 			Healthy_block_no = BlocksNoPerPlane;
 			Blocks = new Block*[BlocksNoPerPlane];
-			for (unsigned int i = 0; i < BlocksNoPerPlane; i++) {
-				Blocks[i] = new Block(PagesNoPerBlock, i);
-			}
+			// for (unsigned int i = 0; i < BlocksNoPerPlane; i++) {
+			// 	Blocks[i] = new Block(PagesNoPerBlock, i);
+			// }
 			Allocated_streams = NULL;
 		}
 
