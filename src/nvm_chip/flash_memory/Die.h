@@ -4,6 +4,7 @@
 #include "../../sim/Sim_Event.h"
 #include "FlashTypes.h"
 #include "Plane.h"
+#include "Superblock.h"
 
 namespace NVM
 {
@@ -16,7 +17,9 @@ namespace NVM
 			Die(unsigned int PlanesNoPerDie, unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock);
 			~Die();
 			Plane** Planes;
+			Superblock** Superblocks;
 			unsigned int Plane_no;
+			unsigned int Superblock_no;
 			DieStatus Status;
 			MQSimEngine::Sim_Event* CommandFinishEvent;
 			sim_time_type Expected_finish_time;
