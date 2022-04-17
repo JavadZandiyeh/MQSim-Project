@@ -103,6 +103,9 @@
     <ClCompile Include="src\nvm_chip\flash_memory\Plane.cpp">
       <Filter>nvm_chip\flash_memory</Filter>
     </ClCompile>
+    <ClCompile Include="src\nvm_chip\flash_memory\Superblock.cpp">
+      <Filter>nvm_chip\flash_memory</Filter>
+    </ClCompile>
     <ClCompile Include="src\utils\Logical_Address_Partitioning_Unit.cpp">
       <Filter>utils</Filter>
     </ClCompile>
@@ -334,6 +337,9 @@
       <Filter>nvm_chip\flash_memory</Filter>
     </ClInclude>
     <ClInclude Include="src\nvm_chip\flash_memory\Plane.h">
+      <Filter>nvm_chip\flash_memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\nvm_chip\flash_memory\Superblock.h">
       <Filter>nvm_chip\flash_memory</Filter>
     </ClInclude>
     <ClInclude Include="src\nvm_chip\NVM_Chip.h">

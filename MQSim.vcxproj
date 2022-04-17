@@ -39,6 +39,8 @@
     <ClCompile Include="src\nvm_chip\flash_memory\Flash_Chip.cpp" />
     <ClCompile Include="src\nvm_chip\flash_memory\Physical_Page_Address.cpp" />
     <ClCompile Include="src\nvm_chip\flash_memory\Plane.cpp" />
+    <ClCompile Include="src\nvm_chip\flash_memory\Superblock.cpp" />
+    <ClCompile Include="src\nvm_chip\flash_memory\Superblock.h" />
     <ClCompile Include="src\sim\Engine.cpp" />
     <ClCompile Include="src\sim\EventTree.cpp" />
     <ClCompile Include="src\ssd\Address_Mapping_Unit_Base.cpp" />
