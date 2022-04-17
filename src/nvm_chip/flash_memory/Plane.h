@@ -13,7 +13,8 @@ namespace NVM
 		class Plane
 		{
 		public:
-			Plane(unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock);
+			// Plane(unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock);
+			Plane(unsigned int BlocksNoPerPlane);
 			~Plane();
 			Block** Blocks;
 			unsigned int Healthy_block_no;

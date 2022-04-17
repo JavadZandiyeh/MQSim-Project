@@ -18,8 +18,10 @@ namespace NVM
 			~Die();
 			Plane** Planes;
 			Superblock** Superblocks;
+			Block*** BlocksOfDie;
 			unsigned int Plane_no;
 			unsigned int Superblock_no;
+			unsigned int BlocksPerPlane_no;
 			DieStatus Status;
 			MQSimEngine::Sim_Event* CommandFinishEvent;
 			sim_time_type Expected_finish_time;

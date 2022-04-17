@@ -13,7 +13,8 @@ namespace NVM
 		class Superblock
 		{
 		public:
-			Superblock(unsigned int BlocksNoPerSuperblock, unsigned int PagesNoPerBlock);
+			// Superblock(unsigned int BlocksNoPerSuperblock, unsigned int PagesNoPerBlock);
+			Superblock(unsigned int BlocksNoPerSuperblock);
 			~Superblock();
 			Block** Blocks;
 			unsigned int Healthy_block_no;

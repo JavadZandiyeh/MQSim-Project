@@ -4,7 +4,8 @@ namespace NVM
 {
 	namespace FlashMemory
 	{
-		Plane::Plane(unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock) :
+		// Plane::Plane(unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock) :
+		Plane::Plane(unsigned int BlocksNoPerPlane) :
 			Read_count(0), Progam_count(0), Erase_count(0)
 		{
 			Healthy_block_no = BlocksNoPerPlane;
@@ -17,10 +18,10 @@ namespace NVM
 
 		Plane::~Plane()
 		{
-			for (unsigned int i = 0; i < Healthy_block_no; i++) {
-				delete Blocks[i];
-			}
-			delete[] Blocks;
+			// for (unsigned int i = 0; i < Healthy_block_no; i++) {
+			// 	delete Blocks[i];
+			// }
+			// delete[] Blocks;
 		}
 	}
 }
