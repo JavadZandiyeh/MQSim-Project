@@ -4,7 +4,7 @@
 #include "../../sim/Sim_Event.h"
 #include "FlashTypes.h"
 #include "Plane.h"
-#include "Superblock.h"
+#include "Superblock.h" // including Superblock.h
 
 namespace NVM
 {
@@ -17,8 +17,8 @@ namespace NVM
 			Die(unsigned int PlanesNoPerDie, unsigned int BlocksNoPerPlane, unsigned int PagesNoPerBlock);
 			~Die();
 			Plane** Planes;
-			Superblock** Superblocks;
-			Block*** BlocksOfDie;
+			Superblock** Superblocks; // array of superblocks
+			Block*** BlocksOfDie; // array of arrays for blocks
 			unsigned int Plane_no;
 			unsigned int Superblock_no;
 			unsigned int BlocksPerPlane_no;

@@ -11,6 +11,7 @@
 #include "Flash_Command.h"
 #include <vector>
 #include <stdexcept>
+#include <fstream> // for writing result into file
 
 namespace NVM
 {

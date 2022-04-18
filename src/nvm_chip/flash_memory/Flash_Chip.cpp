@@ -294,4 +294,13 @@ namespace NVM
 			xmlwriter.Write_end_element_tag();
 		}
 	}
+
+	void print_allocation_status(){
+		std::ofstream result_file;
+		result_file.open ("allocation_status.txt");
+  		// result_file << ;
+  		result_file.close();
+
+			
+	}
 }
