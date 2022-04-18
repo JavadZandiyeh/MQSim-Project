@@ -19,6 +19,7 @@ namespace NVM
 			Plane** Planes;
 			Superblock** Superblocks; // array of superblocks
 			Block*** BlocksOfDie; // array of arrays for blocks
+			int* SuperblocksAllocation;
 			unsigned int Plane_no;
 			unsigned int Superblock_no;
 			unsigned int BlocksPerPlane_no;

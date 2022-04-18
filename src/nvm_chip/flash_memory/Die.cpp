@@ -40,9 +40,12 @@ namespace NVM
 			// check if Superblocks and Planes point to the same blocks //
 			// std::cout << &(*(Superblocks[0]->Blocks[0])) << "  " << &(*(Planes[0]->Blocks[0])) << std::endl;	
 
-			// allocate all Superblocks to FlowNo users
+			// allocate all Superblocks to FlowNo users randomly
 			unsigned int FlowNo = 2;
-			allocate_superblocks(SuperblocksNoPerDie, FlowNo);
+			SuperblocksAllocation = new int[Superblock_no];
+			for (unsigned int i = 0; i < Superblock_no; i++){
+				SuperblocksAllocation[i] = rand() % FlowNo;
+			}
 		}
 
 		Die::~Die()
@@ -66,15 +69,6 @@ namespace NVM
 				delete[] BlocksOfDie[blockIDID];
 			}
 			delete[] BlocksOfDie;
-		}
-
-		// allocating Superblocks to flows/users
-		void allocate_superblocks(unsigned int Superblock_no, unsigned int Flow_no){
-			// random allocation
-			int allocatation[Superblock_no];
-			for (unsigned int i = 0; i < Superblock_no; i++){
-				allocatation[i] = rand() % Flow_no;
-			}
 		}
 	}
 }

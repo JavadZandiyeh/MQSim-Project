@@ -36,6 +36,9 @@ namespace NVM
 			for (unsigned int dieID = 0; dieID < dieNo; dieID++) {
 				Dies[dieID] = new Die(PlaneNoPerDie, Block_no_per_plane, Page_no_per_block);
 			}
+
+			// print allocation status for each flow into a file
+			print_allocation_status(channelID, localChipID);
 		}
 
 		Flash_Chip::~Flash_Chip()
@@ -293,14 +296,27 @@ namespace NVM
 		
 			xmlwriter.Write_end_element_tag();
 		}
-	}
 
-	void print_allocation_status(){
-		std::ofstream result_file;
-		result_file.open ("allocation_status.txt");
-  		// result_file << ;
-  		result_file.close();
+		// printing allocation status of superblocks
+		void Flash_Chip::print_allocation_status(flash_channel_ID_type ChannelID, flash_chip_ID_type localChipID){
+			std::ofstream result_file;
+			result_file.open ("allocation_status.txt", std::ios_base::app);
 
+			unsigned int FlowNo = 2;
+			for (unsigned int flow = 0; flow < FlowNo; flow++){
+				for (unsigned int i = 0; i < die_no; i++){
+					result_file << "(flow #" << (flow+1) << "), (Channel #" << ChannelID << "), (Chip #" << ChipID << "), (Die #" << i << ") -> Superblocks:\n";
+					unsigned int superblock_no_in_Die = block_no_in_plane;
+					for (unsigned int j = 0; j < superblock_no_in_Die; j++){
+						if (Dies[i]->SuperblocksAllocation[j] == flow){
+							result_file << "#" << (j+1) << ", ";
+						}
+					}
+					result_file << "\n";
+				}
+			}
 			
+			result_file.close();
+		}
 	}
 }

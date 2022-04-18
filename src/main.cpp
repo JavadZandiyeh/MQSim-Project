@@ -272,8 +272,19 @@ int main(int argc, char* argv[])
 	read_configuration_parameters(ssd_config_file_path, exec_params);
 	std::vector<std::vector<IO_Flow_Parameter_Set*>*>* io_scenarios = read_workload_definitions(workload_defs_file_path);
 
+	// clear result file
+	std::ofstream result_file;
+	result_file.open ("allocation_status.txt", std::ofstream::out | std::ofstream::trunc);
+	result_file.close();
+
 	int cntr = 1;
 	for (auto io_scen = io_scenarios->begin(); io_scen != io_scenarios->end(); io_scen++, cntr++) {
+		// write number of scenario in file
+		result_file.open ("allocation_status.txt", std::ios_base::app);
+		result_file << "\n\n\nIO_Scenario #" << cntr << "\n";
+		result_file.close();
+		
+
 		time_t start_time = time(0);
 		char* dt = ctime(&start_time);
 		PRINT_MESSAGE("MQSim started at " << dt)
