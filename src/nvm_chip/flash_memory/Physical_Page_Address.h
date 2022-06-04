@@ -12,21 +12,24 @@ namespace NVM
 		{
 		private:
 			static bool block_address_constraint_for_multiplane;//Block address of the commands to neighbor planes must be identical for multiplane command execution
+			static bool block_address_constraint_for_multisuperblock;//Block address of the commands to neighbor superblocks must be identical for multisuperblock command execution
 		public:
 			flash_channel_ID_type ChannelID;
 			flash_chip_ID_type ChipID;        //The flashchip ID inside its channel
 			flash_die_ID_type DieID;
 			flash_plane_ID_type PlaneID;
+			flash_superblock_ID_type SuperblockID;
 			flash_block_ID_type BlockID;
 			flash_page_ID_type PageID;
 
 			Physical_Page_Address(const flash_channel_ID_type channel_id = 0, const flash_chip_ID_type chip_id = 0, const flash_die_ID_type die_id = 0,
-				const flash_plane_ID_type plane_id = 0, const flash_block_ID_type block_id = 0, const flash_page_ID_type page_id = 0)
+				const flash_plane_ID_type plane_id = 0, const flash_superblock_ID_type superblock_id = 0, const flash_block_ID_type block_id = 0, const flash_page_ID_type page_id = 0)
 			{
 				ChannelID = channel_id;
 				ChipID = chip_id;
 				DieID = die_id;
 				PlaneID = plane_id;
+				SuperblockID = superblock_id;
 				BlockID = block_id;
 				PageID = page_id;
 			}
@@ -37,6 +40,7 @@ namespace NVM
 				ChipID = addressToCopy.ChipID;
 				DieID = addressToCopy.DieID;
 				PlaneID = addressToCopy.PlaneID;
+				SuperblockID = addressToCopy.SuperblockID;
 				BlockID = addressToCopy.BlockID;
 				PageID = addressToCopy.PageID;
 			}
@@ -44,6 +48,11 @@ namespace NVM
 			static void SetBlockAddressConstraint(const bool BAConstraint)
 			{
 				block_address_constraint_for_multiplane = BAConstraint;
+			}
+
+			static void SetBlockAddressConstraintSuperblock(const bool BAConstraint)
+			{
+				block_address_constraint_for_multisuperblock = BAConstraint;
 			}
 		};
 	}

@@ -1,5 +1,5 @@
 #include "Flash_Block_Manager.h"
-
+#include "cmath"
 
 namespace SSD_Components
 {
@@ -9,8 +9,61 @@ namespace SSD_Components
 		unsigned int block_no_per_plane, unsigned int page_no_per_block)
 		: gc_and_wl_unit(gc_and_wl_unit), max_allowed_block_erase_count(max_allowed_block_erase_count), total_concurrent_streams_no(total_concurrent_streams_no),
 		channel_count(channel_count), chip_no_per_channel(chip_no_per_channel), die_no_per_chip(die_no_per_chip), plane_no_per_die(plane_no_per_die),
-		block_no_per_plane(block_no_per_plane), pages_no_per_block(page_no_per_block)
+		block_no_per_plane(block_no_per_plane), superblock_no_per_die(block_no_per_plane), block_no_per_superblock(plane_no_per_die),
+		pages_no_per_block(page_no_per_block)
 	{
+
+		// superblock_manager initializing
+		superblock_manager = new SuperblockBookKeepingType***[channel_count];
+		for (unsigned int channelID = 0; channelID < channel_count; channelID++) {
+			superblock_manager[channelID] = new SuperblockBookKeepingType**[chip_no_per_channel];
+			for (unsigned int chipID = 0; chipID < chip_no_per_channel; chipID++) {
+				superblock_manager[channelID][chipID] = new SuperblockBookKeepingType*[die_no_per_chip];
+				for (unsigned int dieID = 0; dieID < die_no_per_chip; dieID++) {
+					superblock_manager[channelID][chipID][dieID] = new SuperblockBookKeepingType[superblock_no_per_die];
+
+					//Initialize superblock book keeping data structure
+					for (unsigned int superblockID = 0; superblockID < superblock_no_per_die; superblockID++) {
+						superblock_manager[channelID][chipID][dieID][superblockID].Total_pages_count = block_no_per_superblock * pages_no_per_block;
+						superblock_manager[channelID][chipID][dieID][superblockID].Free_pages_count = block_no_per_superblock * pages_no_per_block;
+						superblock_manager[channelID][chipID][dieID][superblockID].Valid_pages_count = 0;
+						superblock_manager[channelID][chipID][dieID][superblockID].Invalid_pages_count = 0;
+						superblock_manager[channelID][chipID][dieID][superblockID].Ongoing_erase_operations.clear();
+						superblock_manager[channelID][chipID][dieID][superblockID].Blocks = new Block_Pool_Slot_Type[block_no_per_superblock];
+						
+						//Initialize block pool for superblock
+						for (unsigned int blockID = 0; blockID < block_no_per_superblock; blockID++) {
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].BlockID = blockID;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Current_page_write_index = 0;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Current_status = Block_Service_Status::IDLE;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Invalid_page_count = 0;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Erase_count = 0;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Holds_mapping_data = false;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Has_ongoing_gc_wl = false;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Erase_transaction = NULL;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Ongoing_user_program_count = 0;
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Ongoing_user_read_count = 0;
+							Block_Pool_Slot_Type::Page_vector_size = pages_no_per_block / (sizeof(uint64_t) * 8) + (pages_no_per_block % (sizeof(uint64_t) * 8) == 0 ? 0 : 1);
+							superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Invalid_page_bitmap = new uint64_t[Block_Pool_Slot_Type::Page_vector_size];
+							for (unsigned int i = 0; i < Block_Pool_Slot_Type::Page_vector_size; i++) {
+								superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID].Invalid_page_bitmap[i] = All_VALID_PAGE;
+							}
+							superblock_manager[channelID][chipID][dieID][superblockID].Add_to_free_block_pool_superblock(&superblock_manager[channelID][chipID][dieID][superblockID].Blocks[blockID], false);
+						}
+						superblock_manager[channelID][chipID][dieID][superblockID].Data_wf = new Block_Pool_Slot_Type*[total_concurrent_streams_no];
+						superblock_manager[channelID][chipID][dieID][superblockID].Translation_wf = new Block_Pool_Slot_Type*[total_concurrent_streams_no];
+						superblock_manager[channelID][chipID][dieID][superblockID].GC_wf = new Block_Pool_Slot_Type*[total_concurrent_streams_no];
+						for (unsigned int stream_cntr = 0; stream_cntr < total_concurrent_streams_no; stream_cntr++) {
+							superblock_manager[channelID][chipID][dieID][superblockID].Data_wf[stream_cntr] = superblock_manager[channelID][chipID][dieID][superblockID].Get_a_free_block_superblock(stream_cntr, false);
+							superblock_manager[channelID][chipID][dieID][superblockID].Translation_wf[stream_cntr] = superblock_manager[channelID][chipID][dieID][superblockID].Get_a_free_block_superblock(stream_cntr, true);
+							superblock_manager[channelID][chipID][dieID][superblockID].GC_wf[stream_cntr] = superblock_manager[channelID][chipID][dieID][superblockID].Get_a_free_block_superblock(stream_cntr, false);
+						}
+					}
+				}
+			}
+		}
+
+		// plane_manager initializing
 		plane_manager = new PlaneBookKeepingType***[channel_count];
 		for (unsigned int channelID = 0; channelID < channel_count; channelID++) {
 			plane_manager[channelID] = new PlaneBookKeepingType**[chip_no_per_channel];
@@ -63,6 +116,7 @@ namespace SSD_Components
 
 	Flash_Block_Manager_Base::~Flash_Block_Manager_Base() 
 	{
+		// delete plane_manager
 		for (unsigned int channel_id = 0; channel_id < channel_count; channel_id++) {
 			for (unsigned int chip_id = 0; chip_id < chip_no_per_channel; chip_id++) {
 				for (unsigned int die_id = 0; die_id < die_no_per_chip; die_id++) {
@@ -82,6 +136,27 @@ namespace SSD_Components
 			delete[] plane_manager[channel_id];
 		}
 		delete[] plane_manager;
+
+		// delete superblock_manager
+		for (unsigned int channel_id = 0; channel_id < channel_count; channel_id++) {
+			for (unsigned int chip_id = 0; chip_id < chip_no_per_channel; chip_id++) {
+				for (unsigned int die_id = 0; die_id < die_no_per_chip; die_id++) {
+					for (unsigned int superblock_id = 0; superblock_id < superblock_no_per_die; superblock_id++) {
+						for (unsigned int blockID = 0; blockID < block_no_per_superblock; blockID++) {
+							delete[] superblock_manager[channel_id][chip_id][die_id][superblock_id].Blocks[blockID].Invalid_page_bitmap;
+						}
+						delete[] superblock_manager[channel_id][chip_id][die_id][superblock_id].Blocks;
+						delete[] superblock_manager[channel_id][chip_id][die_id][superblock_id].GC_wf;
+						delete[] superblock_manager[channel_id][chip_id][die_id][superblock_id].Data_wf;
+						delete[] superblock_manager[channel_id][chip_id][die_id][superblock_id].Translation_wf;
+					}
+					delete[] superblock_manager[channel_id][chip_id][die_id];
+				}
+				delete[] superblock_manager[channel_id][chip_id];
+			}
+			delete[] superblock_manager[channel_id];
+		}
+		delete[] superblock_manager;
 	}
 
 	void Flash_Block_Manager_Base::Set_GC_and_WL_Unit(GC_and_WL_Unit_Base* gcwl)
@@ -107,9 +182,25 @@ namespace SSD_Components
 		Block_Pool_Slot_Type* new_block = NULL;
 		new_block = (*Free_block_pool.begin()).second;//Assign a new write frontier block
 		if (Free_block_pool.size() == 0) {
-			PRINT_ERROR("Requesting a free block from an empty pool!")
+			PRINT_ERROR("Requesting a free block from an empty pool in plane!")
 		}
 		Free_block_pool.erase(Free_block_pool.begin());
+		new_block->Stream_id = stream_id;
+		new_block->Holds_mapping_data = for_mapping_data;
+		Block_usage_history.push(new_block->BlockID);
+
+		return new_block;
+	}
+
+	Block_Pool_Slot_Type* SuperblockBookKeepingType::Get_a_free_block_superblock(stream_id_type stream_id, bool for_mapping_data)
+	{
+		Block_Pool_Slot_Type* new_block = NULL;
+		new_block = (*Free_block_pool_superblock.begin()).second;//Assign a new write frontier block
+		printf("%ld\n\n", Free_block_pool_superblock.size());
+		if (Free_block_pool_superblock.size() == 0) {
+			PRINT_ERROR("Requesting a free block from an empty pool in superblock!")
+		}
+		Free_block_pool_superblock.erase(Free_block_pool_superblock.begin());
 		new_block->Stream_id = stream_id;
 		new_block->Holds_mapping_data = for_mapping_data;
 		Block_usage_history.push(new_block->BlockID);
@@ -127,9 +218,24 @@ namespace SSD_Components
 		}
 	}
 
+	void SuperblockBookKeepingType::Check_bookkeeping_correctness_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		if (Total_pages_count != Free_pages_count + Valid_pages_count + Invalid_pages_count) {
+			PRINT_ERROR("Inconsistent status in the plane bookkeeping record!")
+		}
+		if (Free_pages_count == 0) {
+			PRINT_ERROR("Plane " << "@" << superblock_address.ChannelID << "@" << superblock_address.ChipID << "@" << superblock_address.DieID << "@" << superblock_address.PlaneID << " pool size: " << Get_free_block_pool_size_superblock() << " ran out of free pages! Bad resource management! It is not safe to continue simulation!");
+		}
+	}
+
 	unsigned int PlaneBookKeepingType::Get_free_block_pool_size()
 	{
 		return (unsigned int)Free_block_pool.size();
+	}
+
+	unsigned int SuperblockBookKeepingType::Get_free_block_pool_size_superblock()
+	{
+		return (unsigned int)Free_block_pool_superblock.size();
 	}
 
 	void PlaneBookKeepingType::Add_to_free_block_pool(Block_Pool_Slot_Type* block, bool consider_dynamic_wl)
@@ -140,6 +246,17 @@ namespace SSD_Components
 		} else {
 			std::pair<unsigned int, Block_Pool_Slot_Type*> entry(0, block);
 			Free_block_pool.insert(entry);
+		}
+	}
+
+	void SuperblockBookKeepingType::Add_to_free_block_pool_superblock(Block_Pool_Slot_Type* block, bool consider_dynamic_wl)
+	{
+		if (consider_dynamic_wl) {
+			std::pair<unsigned int, Block_Pool_Slot_Type*> entry(block->Erase_count, block);
+			Free_block_pool_superblock.insert(entry);
+		} else {
+			std::pair<unsigned int, Block_Pool_Slot_Type*> entry(0, block);
+			Free_block_pool_superblock.insert(entry);
 		}
 	}
 
@@ -161,6 +278,24 @@ namespace SSD_Components
 		return max_erased_block - min_erased_block;
 	}
 
+	unsigned int Flash_Block_Manager_Base::Get_min_max_erase_difference_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		unsigned int min_erased_block = 0;
+		unsigned int max_erased_block = 0;
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID][superblock_address.SuperblockID];
+
+		for (unsigned int i = 1; i < block_no_per_superblock; i++) {
+			if (superblock_record->Blocks[i].Erase_count > superblock_record->Blocks[max_erased_block].Erase_count) {
+				max_erased_block = i;
+			}
+			if (superblock_record->Blocks[i].Erase_count < superblock_record->Blocks[min_erased_block].Erase_count) {
+				min_erased_block = i;
+			}
+		}
+
+		return max_erased_block - min_erased_block;
+	}
+
 	flash_block_ID_type Flash_Block_Manager_Base::Get_coldest_block_id(const NVM::FlashMemory::Physical_Page_Address& plane_address)
 	{
 		unsigned int min_erased_block = 0;
@@ -175,9 +310,28 @@ namespace SSD_Components
 		return min_erased_block;
 	}
 
+	flash_block_ID_type Flash_Block_Manager_Base::Get_coldest_block_id_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		unsigned int min_erased_block = 0;
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID][superblock_address.PlaneID];
+
+		for (unsigned int i = 1; i < block_no_per_superblock; i++) {
+			if (superblock_record->Blocks[i].Erase_count < superblock_record->Blocks[min_erased_block].Erase_count) {
+				min_erased_block = i;
+			}
+		}
+		
+		return min_erased_block;
+	}
+
 	PlaneBookKeepingType* Flash_Block_Manager_Base::Get_plane_bookkeeping_entry(const NVM::FlashMemory::Physical_Page_Address& plane_address)
 	{
 		return &(plane_manager[plane_address.ChannelID][plane_address.ChipID][plane_address.DieID][plane_address.PlaneID]);
+	}
+
+	SuperblockBookKeepingType* Flash_Block_Manager_Base::Get_superblock_bookkeeping_entry(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		return &(superblock_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID][superblock_address.PlaneID]);
 	}
 
 	bool Flash_Block_Manager_Base::Block_has_ongoing_gc_wl(const NVM::FlashMemory::Physical_Page_Address& block_address)
@@ -186,16 +340,34 @@ namespace SSD_Components
 		return plane_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl;
 	}
 	
+	bool Flash_Block_Manager_Base::Block_has_ongoing_gc_wl_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.SuperblockID];
+		return superblock_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl;
+	}
+
 	bool Flash_Block_Manager_Base::Can_execute_gc_wl(const NVM::FlashMemory::Physical_Page_Address& block_address)
 	{
 		PlaneBookKeepingType *plane_record = &plane_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.PlaneID];
 		return (plane_record->Blocks[block_address.BlockID].Ongoing_user_program_count + plane_record->Blocks[block_address.BlockID].Ongoing_user_read_count == 0);
 	}
 	
+	bool Flash_Block_Manager_Base::Can_execute_gc_wl_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.SuperblockID];
+		return (superblock_record->Blocks[block_address.BlockID].Ongoing_user_program_count + superblock_record->Blocks[block_address.BlockID].Ongoing_user_read_count == 0);
+	}
+
 	void Flash_Block_Manager_Base::GC_WL_started(const NVM::FlashMemory::Physical_Page_Address& block_address)
 	{
 		PlaneBookKeepingType *plane_record = &plane_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.PlaneID];
 		plane_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl = true;
+	}
+
+	void Flash_Block_Manager_Base::GC_WL_started_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.SuperblockID];
+		superblock_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl = true;
 	}
 	
 	void Flash_Block_Manager_Base::program_transaction_issued(const NVM::FlashMemory::Physical_Page_Address& page_address)
@@ -204,10 +376,22 @@ namespace SSD_Components
 		plane_record->Blocks[page_address.BlockID].Ongoing_user_program_count++;
 	}
 	
+	void Flash_Block_Manager_Base::program_transaction_issued_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.SuperblockID];
+		superblock_record->Blocks[page_address.BlockID].Ongoing_user_program_count++;
+	}
+
 	void Flash_Block_Manager_Base::Read_transaction_issued(const NVM::FlashMemory::Physical_Page_Address& page_address)
 	{
 		PlaneBookKeepingType *plane_record = &plane_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.PlaneID];
 		plane_record->Blocks[page_address.BlockID].Ongoing_user_read_count++;
+	}
+
+	void Flash_Block_Manager_Base::Read_transaction_issued_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.SuperblockID];
+		superblock_record->Blocks[page_address.BlockID].Ongoing_user_read_count++;
 	}
 
 	void Flash_Block_Manager_Base::Program_transaction_serviced(const NVM::FlashMemory::Physical_Page_Address& page_address)
@@ -216,16 +400,34 @@ namespace SSD_Components
 		plane_record->Blocks[page_address.BlockID].Ongoing_user_program_count--;
 	}
 
+	void Flash_Block_Manager_Base::Program_transaction_serviced_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.SuperblockID];
+		superblock_record->Blocks[page_address.BlockID].Ongoing_user_program_count--;
+	}
+
 	void Flash_Block_Manager_Base::Read_transaction_serviced(const NVM::FlashMemory::Physical_Page_Address& page_address)
 	{
 		PlaneBookKeepingType *plane_record = &plane_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.PlaneID];
 		plane_record->Blocks[page_address.BlockID].Ongoing_user_read_count--;
 	}
 	
+	void Flash_Block_Manager_Base::Read_transaction_serviced_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[page_address.ChannelID][page_address.ChipID][page_address.DieID][page_address.SuperblockID];
+		superblock_record->Blocks[page_address.BlockID].Ongoing_user_read_count--;
+	}
+
 	bool Flash_Block_Manager_Base::Is_having_ongoing_program(const NVM::FlashMemory::Physical_Page_Address& block_address)
 	{
 		PlaneBookKeepingType *plane_record = &plane_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.PlaneID];
 		return plane_record->Blocks[block_address.BlockID].Ongoing_user_program_count > 0;
+	}
+
+	bool Flash_Block_Manager_Base::Is_having_ongoing_program_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.SuperblockID];
+		return superblock_record->Blocks[block_address.BlockID].Ongoing_user_program_count > 0;
 	}
 
 	void Flash_Block_Manager_Base::GC_WL_finished(const NVM::FlashMemory::Physical_Page_Address& block_address)
@@ -234,6 +436,12 @@ namespace SSD_Components
 		plane_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl = false;
 	}
 	
+	void Flash_Block_Manager_Base::GC_WL_finished_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address)
+	{
+		SuperblockBookKeepingType *superblock_record = &superblock_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.SuperblockID];
+		superblock_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl = false;
+	}
+
 	bool Flash_Block_Manager_Base::Is_page_valid(Block_Pool_Slot_Type* block, flash_page_ID_type page_id)
 	{
 		if ((block->Invalid_page_bitmap[page_id / 64] & (((uint64_t)1) << page_id)) == 0) {

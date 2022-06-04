@@ -19,6 +19,7 @@ typedef uint32_t flash_channel_ID_type;
 typedef uint32_t flash_chip_ID_type;
 typedef uint32_t flash_die_ID_type;
 typedef uint32_t flash_plane_ID_type;
+typedef uint32_t flash_superblock_ID_type;
 typedef uint32_t flash_block_ID_type;
 typedef uint32_t flash_page_ID_type;
 typedef uint64_t LPA_type;
