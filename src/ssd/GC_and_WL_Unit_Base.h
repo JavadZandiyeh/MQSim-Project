@@ -30,7 +30,7 @@ namespace SSD_Components
 	class TSU_Base;
 	class NVM_PHY_ONFI;
 	class PlaneBookKeepingType;
-	class SuperblockBookKeepingType;
+	class Superblock_Slot_Type;
 	class Block_Pool_Slot_Type;
 
 	/*

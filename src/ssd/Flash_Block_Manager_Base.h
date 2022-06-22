@@ -65,47 +65,48 @@ namespace SSD_Components
 		void Add_to_free_block_pool(Block_Pool_Slot_Type* block, bool consider_dynamic_wl);
 	};
 
-	class SuperblockBookKeepingType
+	class Superblock_Slot_Type
 	{
 	public:
 		flash_superblock_ID_type SuperblockID;
-		unsigned int Total_pages_count;
-		unsigned int Free_pages_count;
-		unsigned int Valid_pages_count;
-		unsigned int Invalid_pages_count;
+		// unsigned int Total_pages_count;
+		// unsigned int Free_pages_count;
+		// unsigned int Valid_pages_count;
+		// unsigned int Invalid_pages_count;
 		unsigned int Erase_count;
 		stream_id_type Stream_id = NO_STREAM; //which stream this superblock belong to
 		bool Holds_mapping_data = false;
-		bool Has_ongoing_gc_wl = false;
+		// bool Has_ongoing_gc_wl = false;
 		int Ongoing_user_program_count;
 		int Ongoing_user_read_count;
-		Block_Pool_Slot_Type* Blocks;
-		std::multimap<unsigned int, Block_Pool_Slot_Type*> Free_block_pool_superblock;
-		std::queue<flash_block_ID_type> Block_usage_history;//A fifo queue that keeps track of flash blocks based on their usage history
-		std::set<flash_block_ID_type> Ongoing_erase_operations;
-		Block_Pool_Slot_Type* Get_a_free_block_superblock(stream_id_type stream_id, bool for_mapping_data);
-		unsigned int Get_free_block_pool_size_superblock();
-		void Check_bookkeeping_correctness_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
-		void Add_to_free_block_pool_superblock(Block_Pool_Slot_Type* block, bool consider_dynamic_wl);
+		Block_Pool_Slot_Type** Blocks;
+		// std::multimap<unsigned int, Block_Pool_Slot_Type*> Free_block_pool_superblock;
+		// std::queue<flash_block_ID_type> Block_usage_history;//A fifo queue that keeps track of flash blocks based on their usage history
+		// std::set<flash_block_ID_type> Ongoing_erase_operations;
+		// Block_Pool_Slot_Type* Get_a_free_block_superblock(stream_id_type stream_id, bool for_mapping_data);
+		// unsigned int Get_free_block_pool_size_superblock();
+		// void Check_bookkeeping_correctness_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
+		// void Add_to_free_block_pool_superblock(Block_Pool_Slot_Type* block, bool consider_dynamic_wl);
 	};
 
 	class DieBookKeepingType
 	{
 	public:
-		unsigned int Total_pages_count;
-		unsigned int Free_pages_count;
-		unsigned int Valid_pages_count;
-		unsigned int Invalid_pages_count;
-		SuperblockBookKeepingType* Superblocks;
-		std::multimap<unsigned int, SuperblockBookKeepingType*> Free_superblock_pool;
-		SuperblockBookKeepingType** Data_wf, ** GC_wf; //The write frontier superblocks for data and GC pages. MQSim adopts Double Write Frontier approach for user and GC writes which is shown very advantages in: B. Van Houdt, "On the necessity of hot and cold data identification to reduce the write amplification in flash - based SSDs", Perf. Eval., 2014
-		SuperblockBookKeepingType** Translation_wf; //The write frontier superblocks for translation GC pages
+		// unsigned int Total_pages_count;
+		// unsigned int Free_pages_count;
+		// unsigned int Valid_pages_count;
+		// unsigned int Invalid_pages_count;
+		Superblock_Slot_Type* Superblocks;
+		PlaneBookKeepingType* plane_manager_die;
+		std::multimap<unsigned int, Superblock_Slot_Type*> Free_superblock_pool;
+		Superblock_Slot_Type** Data_swf, ** GC_swf; //The write frontier superblocks for data and GC pages. MQSim adopts Double Write Frontier approach for user and GC writes which is shown very advantages in: B. Van Houdt, "On the necessity of hot and cold data identification to reduce the write amplification in flash - based SSDs", Perf. Eval., 2014
+		Superblock_Slot_Type** Translation_swf; //The write frontier superblocks for translation GC pages
 		std::queue<flash_superblock_ID_type> Superblock_usage_history;//A fifo queue that keeps track of flash superblocks based on their usage history
 		std::set<flash_superblock_ID_type> Ongoing_erase_operations;
-		SuperblockBookKeepingType* Get_a_free_superblock(stream_id_type stream_id, bool for_mapping_data);
+		Superblock_Slot_Type* Get_a_free_superblock(stream_id_type stream_id, bool for_mapping_data);
 		unsigned int Get_free_superblock_pool_size();
 		void Check_bookkeeping_correctness_die(const NVM::FlashMemory::Physical_Page_Address& die_address);
-		void Add_to_free_superblock_pool(SuperblockBookKeepingType* superblock, bool consider_dynamic_wl);
+		void Add_to_free_superblock_pool(Superblock_Slot_Type* superblock, bool consider_dynamic_wl, unsigned int block_no_per_superblock, bool release);
 	};
 
 	class Flash_Block_Manager_Base
