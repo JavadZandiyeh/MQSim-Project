@@ -24,15 +24,6 @@ namespace SSD_Components
 		void Add_erased_block_to_pool(const NVM::FlashMemory::Physical_Page_Address& address);
 		unsigned int Get_pool_size(const NVM::FlashMemory::Physical_Page_Address& plane_address);
 		
-		// void Allocate_block_and_page_in_superblock_for_user_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address);		
-		// void Allocate_block_and_page_in_superblock_for_gc_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address);
-		// void Allocate_Pages_in_block_and_invalidate_remaining_for_preconditioning_superblock(const stream_id_type stream_id, const NVM::FlashMemory::Physical_Page_Address& superblock_address, std::vector<NVM::FlashMemory::Physical_Page_Address>& page_addresses);
-		// void Allocate_block_and_page_in_superblock_for_translation_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address, bool is_for_gc);
-		// void Invalidate_page_in_block_superblock(const stream_id_type streamID, const NVM::FlashMemory::Physical_Page_Address& address);
-		// void Invalidate_page_in_block_for_preconditioning_superblock(const stream_id_type streamID, const NVM::FlashMemory::Physical_Page_Address& address);		
-		// void Add_erased_block_to_pool_superblock(const NVM::FlashMemory::Physical_Page_Address& address);
-		// unsigned int Get_pool_size_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
-	
 	private:
 	};
 }

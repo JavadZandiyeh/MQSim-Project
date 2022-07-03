@@ -1768,7 +1768,7 @@ namespace SSD_Components
 	inline void Address_Mapping_Unit_Page_Level::Set_barrier_for_accessing_physical_block(const NVM::FlashMemory::Physical_Page_Address& block_address)
 	{
 		//The LPAs are actually not known until they are read one-by-one from flash storage. But, to reduce MQSim's complexity, we assume that LPAs are stored in DRAM and thus no read from flash storage is needed.
-		Block_Pool_Slot_Type* block = &(block_manager->plane_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID][block_address.PlaneID].Blocks[block_address.BlockID]);
+		Block_Pool_Slot_Type* block = &(block_manager->die_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID].plane_manager_die[block_address.PlaneID].Blocks[block_address.BlockID]);
 		NVM::FlashMemory::Physical_Page_Address addr(block_address);
 		for (flash_page_ID_type pageID = 0; pageID < block->Current_page_write_index; pageID++) {
 			if (block_manager->Is_page_valid(block, pageID)) {

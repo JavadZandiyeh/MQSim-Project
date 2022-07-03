@@ -73,13 +73,14 @@ namespace SSD_Components
 		// unsigned int Free_pages_count;
 		// unsigned int Valid_pages_count;
 		// unsigned int Invalid_pages_count;
-		unsigned int Erase_count;
+		// unsigned int Erase_count;
 		stream_id_type Stream_id = NO_STREAM; //which stream this superblock belong to
 		bool Holds_mapping_data = false;
-		// bool Has_ongoing_gc_wl = false;
+		bool Has_ongoing_gc_wl = false;
 		int Ongoing_user_program_count;
 		int Ongoing_user_read_count;
 		Block_Pool_Slot_Type** Blocks;
+		int block_no_per_superblock;
 		// std::multimap<unsigned int, Block_Pool_Slot_Type*> Free_block_pool_superblock;
 		// std::queue<flash_block_ID_type> Block_usage_history;//A fifo queue that keeps track of flash blocks based on their usage history
 		// std::set<flash_block_ID_type> Ongoing_erase_operations;
@@ -87,6 +88,12 @@ namespace SSD_Components
 		// unsigned int Get_free_block_pool_size_superblock();
 		// void Check_bookkeeping_correctness_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
 		// void Add_to_free_block_pool_superblock(Block_Pool_Slot_Type* block, bool consider_dynamic_wl);
+		
+		// unsigned int Get_total_pages_count_superblock();
+		// unsigned int Get_free_pages_count_superblock();
+		// unsigned int Get_valid_pages_count_superblock();
+		unsigned int Get_invalid_pages_count_superblock();
+		unsigned int Get_erase_count_superblock();
 	};
 
 	class DieBookKeepingType
@@ -98,6 +105,8 @@ namespace SSD_Components
 		// unsigned int Invalid_pages_count;
 		Superblock_Slot_Type* Superblocks;
 		PlaneBookKeepingType* plane_manager_die;
+		unsigned int superblock_no_per_die;
+		unsigned int plane_no_per_die;
 		std::multimap<unsigned int, Superblock_Slot_Type*> Free_superblock_pool;
 		Superblock_Slot_Type** Data_swf, ** GC_swf; //The write frontier superblocks for data and GC pages. MQSim adopts Double Write Frontier approach for user and GC writes which is shown very advantages in: B. Van Houdt, "On the necessity of hot and cold data identification to reduce the write amplification in flash - based SSDs", Perf. Eval., 2014
 		Superblock_Slot_Type** Translation_swf; //The write frontier superblocks for translation GC pages
@@ -106,7 +115,8 @@ namespace SSD_Components
 		Superblock_Slot_Type* Get_a_free_superblock(stream_id_type stream_id, bool for_mapping_data);
 		unsigned int Get_free_superblock_pool_size();
 		void Check_bookkeeping_correctness_die(const NVM::FlashMemory::Physical_Page_Address& die_address);
-		void Add_to_free_superblock_pool(Superblock_Slot_Type* superblock, bool consider_dynamic_wl, unsigned int block_no_per_superblock, bool release);
+		void Add_to_free_superblock_pool(Superblock_Slot_Type* superblock, bool consider_dynamic_wl);
+		void Set_swf(unsigned int type, unsigned int stream_cntr);
 	};
 
 	class Flash_Block_Manager_Base
@@ -141,43 +151,23 @@ namespace SSD_Components
 		bool Is_having_ongoing_program(const NVM::FlashMemory::Physical_Page_Address& block_address);//Cheks if block has any ongoing program request
 		void GC_WL_finished(const NVM::FlashMemory::Physical_Page_Address& block_address);//Updates the block bookkeeping record
 
-
-		// virtual void Allocate_block_and_page_in_superblock_for_user_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address) = 0;		
-		// virtual void Allocate_block_and_page_in_superblock_for_gc_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address) = 0;
-		// virtual void Allocate_block_and_page_in_superblock_for_translation_write(const stream_id_type streamID, NVM::FlashMemory::Physical_Page_Address& address, bool is_for_gc) = 0;
-		// virtual void Allocate_Pages_in_block_and_invalidate_remaining_for_preconditioning_superblock(const stream_id_type stream_id, const NVM::FlashMemory::Physical_Page_Address& superblock_address, std::vector<NVM::FlashMemory::Physical_Page_Address>& page_addresses) = 0;
-		// virtual unsigned int Get_pool_size_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address) = 0;
-		// flash_block_ID_type Get_coldest_block_id_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
-		// unsigned int Get_min_max_erase_difference_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
-		// SuperblockBookKeepingType* Get_superblock_bookkeeping_entry(const NVM::FlashMemory::Physical_Page_Address& superblock_address);
-		// bool Block_has_ongoing_gc_wl_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address);//Checks if there is an ongoing gc for block_address
-		// bool Can_execute_gc_wl_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address);//Checks if the gc request can be executed on block_address (there shouldn't be any ongoing user read/program requests targeting block_address)
-		// void GC_WL_started_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address);//Updates the block bookkeeping record
-		// void Read_transaction_issued_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record
-		// void Program_transaction_serviced_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record
-		// void Read_transaction_serviced_superblock(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record
-		// bool Is_having_ongoing_program_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address);//Cheks if block has any ongoing program request
-		// void GC_WL_finished_superblock(const NVM::FlashMemory::Physical_Page_Address& block_address);//Updates the block bookkeeping record
-
-
-		unsigned int Get_min_max_erase_difference_die(const NVM::FlashMemory::Physical_Page_Address& die_address);
+		// unsigned int Get_min_max_erase_difference_die(const NVM::FlashMemory::Physical_Page_Address& die_address);
 		flash_superblock_ID_type Get_coldest_superblock_id(const NVM::FlashMemory::Physical_Page_Address& die_address);
 		DieBookKeepingType* Get_die_bookkeeping_entry(const NVM::FlashMemory::Physical_Page_Address& die_address);
-		bool Superblock_has_ongoing_gc_wl(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Checks if there is an ongoing gc for superblock_address
-		bool Can_execute_gc_wl_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Checks if the gc request can be executed on superblock_address (there shouldn't be any ongoing user read/program requests targeting superblock_address)
-		void GC_WL_started_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Updates the superblock bookkeeping record
-		void Read_transaction_issued_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
-		void Program_transaction_serviced_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
-		void Read_transaction_serviced_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
-		bool Is_having_ongoing_program_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Cheks if superblock has any ongoing program request
-		void GC_WL_finished_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Updates the superblock bookkeeping record
+		// bool Superblock_has_ongoing_gc_wl(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Checks if there is an ongoing gc for superblock_address
+		// bool Can_execute_gc_wl_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Checks if the gc request can be executed on superblock_address (there shouldn't be any ongoing user read/program requests targeting superblock_address)
+		// void GC_WL_started_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Updates the superblock bookkeeping record
+		// void Read_transaction_issued_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
+		// void Program_transaction_serviced_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
+		// void Read_transaction_serviced_die(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the superblock bookkeeping record
+		// bool Is_having_ongoing_program_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Cheks if superblock has any ongoing program request
+		// void GC_WL_finished_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Updates the superblock bookkeeping record
 
 
 
 		bool Is_page_valid(Block_Pool_Slot_Type* block, flash_page_ID_type page_id);//Make the page invalid in the block bookkeeping record
 	protected:
-		PlaneBookKeepingType ****plane_manager;//Keeps track of plane block usage information
-		// SuperblockBookKeepingType ****superblock_manager;//Keeps track of superblock block usage information
+		// PlaneBookKeepingType ****plane_manager;//Keeps track of plane block usage information
 		DieBookKeepingType ***die_manager;//Keeps track of die superblock usage information
 
 		GC_and_WL_Unit_Base *gc_and_wl_unit;

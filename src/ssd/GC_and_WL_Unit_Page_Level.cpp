@@ -40,6 +40,38 @@ namespace SSD_Components
 		return false;
 	}
 
+	void GC_and_WL_Unit_Page_Level::Check_gc_required_die(const unsigned int free_superblock_pool_size, const NVM::FlashMemory::Physical_Page_Address& die_address){
+		if (free_superblock_pool_size < block_pool_gc_threshold) {
+			flash_superblock_ID_type gc_candidate_superblock_id = block_manager->Get_coldest_superblock_id(die_address);
+			DieBookKeepingType* dbke = block_manager->Get_die_bookkeeping_entry(die_address);
+
+			if (dbke->Ongoing_erase_operations.size() >= max_ongoing_gc_reqs_per_plane) {
+				return;
+			}
+
+			switch (block_selection_policy) {
+				case SSD_Components::GC_Block_Selection_Policy_Type::GREEDY://Find the set of superblocks with maximum number of invalid pages and no free pages
+				{
+					gc_candidate_superblock_id = 0;
+					if (dbke->Ongoing_erase_operations.find(0) != dbke->Ongoing_erase_operations.end()) {
+						gc_candidate_superblock_id++;
+					}
+					// superblock_no_per_die is equal to block_no_per_plane
+					for (flash_superblock_ID_type superblock_id = 1; superblock_id < block_no_per_plane; superblock_id++) {
+						if (dbke->Superblocks[superblock_id].Get_invalid_pages_count_superblock() > dbke->Superblocks[gc_candidate_superblock_id].Get_invalid_pages_count_superblock()
+							&& is_safe_gc_wl_candidate_superblock(dbke, superblock_id)
+							// && dbke->Superblocks[superblock_id].Current_page_write_index == pages_no_per_block
+							) {
+							gc_candidate_superblock_id = superblock_id;
+						}
+					}
+					break;
+				}
+			}
+		}
+	}
+
+
 	void GC_and_WL_Unit_Page_Level::Check_gc_required(const unsigned int free_block_pool_size, const NVM::FlashMemory::Physical_Page_Address& plane_address)
 	{
 		if (free_block_pool_size < block_pool_gc_threshold) {
