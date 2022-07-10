@@ -1794,6 +1794,38 @@ namespace SSD_Components
 		}
 	}
 
+	inline void Address_Mapping_Unit_Page_Level::Set_barrier_for_accessing_physical_superblock(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		//The LPAs are actually not known until they are read one-by-one from flash storage. But, to reduce MQSim's complexity, we assume that LPAs are stored in DRAM and thus no read from flash storage is needed.
+		Superblock_Slot_Type* superblock = &(block_manager->die_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID].Superblocks[superblock_address.SuperblockID]);
+		NVM::FlashMemory::Physical_Page_Address addr(superblock_address);
+		for (flash_block_ID_type block_id = 0; block_id < superblock->block_no_per_superblock; block_id++){
+			Block_Pool_Slot_Type* block = superblock->Blocks[block_id];
+			for (flash_page_ID_type pageID = 0; pageID < block->Current_page_write_index; pageID++) {
+				if (block_manager->Is_page_valid(block, pageID)) {
+					addr.PageID = pageID;
+					if (block->Holds_mapping_data) {
+						MVPN_type mpvn = (MVPN_type)flash_controller->Get_metadata(addr.ChannelID, addr.ChipID, addr.DieID, addr.PlaneID, addr.BlockID, addr.PageID);
+						if (domains[block->Stream_id]->GlobalTranslationDirectory[mpvn].MPPN != Convert_address_to_ppa(addr)) {
+							PRINT_ERROR("Inconsistency in the global translation directory when locking an MPVN!")
+							Set_barrier_for_accessing_mvpn(block->Stream_id, mpvn);
+						}
+					} else {
+						LPA_type lpa = flash_controller->Get_metadata(addr.ChannelID, addr.ChipID, addr.DieID, addr.PlaneID, addr.BlockID, addr.PageID);
+						LPA_type ppa = domains[block->Stream_id]->GlobalMappingTable[lpa].PPA;
+						if (domains[block->Stream_id]->CMT->Exists(block->Stream_id, lpa)) {
+							ppa = domains[block->Stream_id]->CMT->Retrieve_ppa(block->Stream_id, lpa);
+						}
+						if (ppa != Convert_address_to_ppa(addr)) {
+							PRINT_ERROR("Inconsistency in the global mapping table when locking an LPA!")
+						}
+						Set_barrier_for_accessing_lpa(block->Stream_id, lpa);
+					}
+				}
+			}
+		}
+	}
+
 	inline void Address_Mapping_Unit_Page_Level::Remove_barrier_for_accessing_lpa(stream_id_type stream_id, LPA_type lpa)
 	{
 		auto itr = domains[stream_id]->Locked_LPAs.find(lpa);

@@ -34,6 +34,7 @@ namespace SSD_Components
 		Block_Service_Status Current_status;
 		unsigned int Invalid_page_count;
 		unsigned int Erase_count;
+		unsigned int pages_no_per_block;
 		static unsigned int Page_vector_size;
 		uint64_t* Invalid_page_bitmap;//A bit sequence that keeps track of valid/invalid status of pages in the block. A "0" means valid, and a "1" means invalid.
 		stream_id_type Stream_id = NO_STREAM;
@@ -94,6 +95,7 @@ namespace SSD_Components
 		// unsigned int Get_valid_pages_count_superblock();
 		unsigned int Get_invalid_pages_count_superblock();
 		unsigned int Get_erase_count_superblock();
+		bool Has_full_block();
 	};
 
 	class DieBookKeepingType
@@ -144,7 +146,9 @@ namespace SSD_Components
 		PlaneBookKeepingType* Get_plane_bookkeeping_entry(const NVM::FlashMemory::Physical_Page_Address& plane_address);
 		bool Block_has_ongoing_gc_wl(const NVM::FlashMemory::Physical_Page_Address& block_address);//Checks if there is an ongoing gc for block_address
 		bool Can_execute_gc_wl(const NVM::FlashMemory::Physical_Page_Address& block_address);//Checks if the gc request can be executed on block_address (there shouldn't be any ongoing user read/program requests targeting block_address)
+		bool Can_execute_gc_wl_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Checks if the gc request can be executed on superblock_address (there shouldn't be any ongoing user read/program requests targeting superblock_address)
 		void GC_WL_started(const NVM::FlashMemory::Physical_Page_Address& block_address);//Updates the block bookkeeping record
+		void GC_WL_started_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address);//Updates the superblock bookkeeping record
 		void Read_transaction_issued(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record
 		void Program_transaction_serviced(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record
 		void Read_transaction_serviced(const NVM::FlashMemory::Physical_Page_Address& page_address);//Updates the block bookkeeping record

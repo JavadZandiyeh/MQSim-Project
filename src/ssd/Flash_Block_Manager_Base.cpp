@@ -47,6 +47,7 @@ namespace SSD_Components
 						//Initialize block pool for plane
 						for (unsigned int blockID = 0; blockID < block_no_per_plane; blockID++) {
 							die_manager[channelID][chipID][dieID].plane_manager_die[planeID].Blocks[blockID].BlockID = blockID;
+							die_manager[channelID][chipID][dieID].plane_manager_die[planeID].Blocks[blockID].pages_no_per_block = pages_no_per_block;
 							die_manager[channelID][chipID][dieID].plane_manager_die[planeID].Blocks[blockID].Current_page_write_index = 0;
 							die_manager[channelID][chipID][dieID].plane_manager_die[planeID].Blocks[blockID].Current_status = Block_Service_Status::IDLE;
 							die_manager[channelID][chipID][dieID].plane_manager_die[planeID].Blocks[blockID].Invalid_page_count = 0;
@@ -174,6 +175,16 @@ namespace SSD_Components
 			Erase_count += Blocks[i]->Erase_count;
 		}
 		return Erase_count;
+	}
+
+	bool Superblock_Slot_Type::Has_full_block(){
+		for (int i = 0; i < block_no_per_superblock; i++){
+			Block_Pool_Slot_Type* block = Blocks[i];
+			if (block->Current_page_write_index == block->pages_no_per_block){
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// -----------------------------------------------------------------------------------------------
@@ -391,10 +402,22 @@ namespace SSD_Components
 		return (plane_record->Blocks[block_address.BlockID].Ongoing_user_program_count + plane_record->Blocks[block_address.BlockID].Ongoing_user_read_count == 0);
 	}
 
+	bool Flash_Block_Manager_Base::Can_execute_gc_wl_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		DieBookKeepingType *die_record = &die_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID];
+		return (die_record->Superblocks[superblock_address.SuperblockID].Ongoing_user_program_count + die_record->Superblocks[superblock_address.SuperblockID].Ongoing_user_read_count == 0);
+	}
+
 	void Flash_Block_Manager_Base::GC_WL_started(const NVM::FlashMemory::Physical_Page_Address& block_address)
 	{
 		PlaneBookKeepingType *plane_record = &die_manager[block_address.ChannelID][block_address.ChipID][block_address.DieID].plane_manager_die[block_address.PlaneID];
 		plane_record->Blocks[block_address.BlockID].Has_ongoing_gc_wl = true;
+	}
+
+	void Flash_Block_Manager_Base::GC_WL_started_die(const NVM::FlashMemory::Physical_Page_Address& superblock_address)
+	{
+		DieBookKeepingType *die_record = &die_manager[superblock_address.ChannelID][superblock_address.ChipID][superblock_address.DieID];
+		die_record->Superblocks[superblock_address.SuperblockID].Has_ongoing_gc_wl = true;
 	}
 
 	void Flash_Block_Manager_Base::program_transaction_issued(const NVM::FlashMemory::Physical_Page_Address& page_address)

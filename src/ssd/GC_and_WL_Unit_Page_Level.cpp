@@ -60,12 +60,80 @@ namespace SSD_Components
 					for (flash_superblock_ID_type superblock_id = 1; superblock_id < block_no_per_plane; superblock_id++) {
 						if (dbke->Superblocks[superblock_id].Get_invalid_pages_count_superblock() > dbke->Superblocks[gc_candidate_superblock_id].Get_invalid_pages_count_superblock()
 							&& is_safe_gc_wl_candidate_superblock(dbke, superblock_id)
-							// && dbke->Superblocks[superblock_id].Current_page_write_index == pages_no_per_block
+							&& dbke->Superblocks[superblock_id].Has_full_block()
 							) {
 							gc_candidate_superblock_id = superblock_id;
 						}
 					}
 					break;
+				}
+			}
+
+			//This should never happen, but we check it here for safty
+			if (dbke->Ongoing_erase_operations.find(gc_candidate_superblock_id) != dbke->Ongoing_erase_operations.end()) {
+				return;
+			}
+
+			// Find candidate superblock by its id
+			NVM::FlashMemory::Physical_Page_Address gc_candidate_address(die_address);
+			gc_candidate_address.SuperblockID = gc_candidate_superblock_id;
+			Superblock_Slot_Type* superblock = &dbke->Superblocks[gc_candidate_superblock_id];
+	
+			//No invalid page to erase
+			unsigned int flag = 0;
+			for (unsigned int i = 0; i < superblock->block_no_per_superblock; i++){
+				if (superblock->Blocks[i]->Current_page_write_index == 0){
+					flag += 1;
+				}
+			}
+			if ((flag == superblock->block_no_per_superblock) || (superblock->Get_invalid_pages_count_superblock() == 0)) {
+				return;
+			}
+			
+			//Run the state machine to protect against race condition
+			block_manager->GC_WL_started_die(gc_candidate_address);
+			dbke->Ongoing_erase_operations.insert(gc_candidate_superblock_id);
+			address_mapping_unit->Set_barrier_for_accessing_physical_superblock(gc_candidate_address);//Lock the blocks of superblock, so no user request can intervene while the GC is progressing
+
+			//If there are ongoing requests targeting the candidate superblock, the gc execution should be postponed
+			if (block_manager->Can_execute_gc_wl_die(gc_candidate_address)) {
+				for (unsigned int i = 0; i < superblock->block_no_per_superblock; i++){
+					Stats::Total_gc_executions++;
+					tsu->Prepare_for_transaction_submit();
+	
+					Block_Pool_Slot_Type* block = superblock->Blocks[i];
+					NVM_Transaction_Flash_ER* gc_erase_tr = new NVM_Transaction_Flash_ER(Transaction_Source_Type::GC_WL, dbke->Superblocks[gc_candidate_superblock_id].Stream_id, gc_candidate_address);
+					//If there are some valid pages in block, then prepare flash transactions for page movement
+					if (block->Current_page_write_index - block->Invalid_page_count > 0) {
+						NVM_Transaction_Flash_RD* gc_read = NULL;
+						NVM_Transaction_Flash_WR* gc_write = NULL;
+						for (flash_page_ID_type pageID = 0; pageID < block->Current_page_write_index; pageID++) {
+							if (block_manager->Is_page_valid(block, pageID)) {
+								Stats::Total_page_movements_for_gc++;
+								gc_candidate_address.PageID = pageID;
+								if (use_copyback) {
+									gc_write = new NVM_Transaction_Flash_WR(Transaction_Source_Type::GC_WL, block->Stream_id, sector_no_per_page * SECTOR_SIZE_IN_BYTE,
+										NO_LPA, address_mapping_unit->Convert_address_to_ppa(gc_candidate_address), NULL, 0, NULL, 0, INVALID_TIME_STAMP);
+									gc_write->ExecutionMode = WriteExecutionModeType::COPYBACK;
+									tsu->Submit_transaction(gc_write);
+								} else {
+									gc_read = new NVM_Transaction_Flash_RD(Transaction_Source_Type::GC_WL, block->Stream_id, sector_no_per_page * SECTOR_SIZE_IN_BYTE,
+										NO_LPA, address_mapping_unit->Convert_address_to_ppa(gc_candidate_address), gc_candidate_address, NULL, 0, NULL, 0, INVALID_TIME_STAMP);
+									gc_write = new NVM_Transaction_Flash_WR(Transaction_Source_Type::GC_WL, block->Stream_id, sector_no_per_page * SECTOR_SIZE_IN_BYTE,
+										NO_LPA, NO_PPA, gc_candidate_address, NULL, 0, gc_read, 0, INVALID_TIME_STAMP);
+									gc_write->ExecutionMode = WriteExecutionModeType::SIMPLE;
+									gc_write->RelatedErase = gc_erase_tr;
+									gc_read->RelatedWrite = gc_write;
+									tsu->Submit_transaction(gc_read);//Only the read transaction would be submitted. The Write transaction is submitted when the read transaction is finished and the LPA of the target page is determined
+								}
+								gc_erase_tr->Page_movement_activities.push_back(gc_write);
+							}
+						}
+					}
+					block->Erase_transaction = gc_erase_tr;
+					tsu->Submit_transaction(gc_erase_tr);
+
+					tsu->Schedule();				
 				}
 			}
 		}
